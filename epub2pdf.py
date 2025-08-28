@@ -15,6 +15,9 @@ import shutil
 import re
 from typing import List, Optional, Dict
 
+# 设置递归限制，防止递归过深
+sys.setrecursionlimit(3000)
+
 try:
     import ebooklib
     from ebooklib import epub
@@ -250,44 +253,70 @@ class EPUBtoPDFConverter:
         Returns:
             替换后的HTML内容
         """
+        if not images:
+            return content
+            
         # 匹配所有img标签的src属性
         img_pattern = r'<img[^>]*src\s*=\s*["\']([^"\']+)["\'][^>]*>'
         
         def replace_img_src(match):
-            full_tag = match.group(0)
-            src = match.group(1)
-            
-            # 尝试多种可能的图片路径格式
-            possible_keys = [
-                src,  # 原始路径
-                src.split('/')[-1],  # 只要文件名
-                src.replace('../', ''),  # 移除相对路径前缀
-                src.replace('./', ''),  # 移除当前目录前缀
-                src.lstrip('/'),  # 移除开头的斜杠
-                src.replace('images/', ''),  # 移除images目录前缀
-                src.replace('Images/', ''),  # 移除Images目录前缀（大写）
-                src.replace('IMAGES/', ''),  # 移除IMAGES目录前缀（全大写）
-            ]
-            
-            # 添加常见的图片子目录组合
-            for key in list(possible_keys):
-                if '/' in key:
-                    possible_keys.append(key.split('/')[-1])  # 只要最后的文件名
-            
-            # 尝试查找匹配的图片
-            for key in possible_keys:
-                if key in images:
-                    # 替换src属性
-                    new_tag = re.sub(r'src\s*=\s*["\'][^"\']+["\']', f'src="{images[key]}"', full_tag)
-                    return new_tag
-            
-            # 如果没找到匹配的图片，返回原标签但移除src以避免错误
-            self.logger.debug(f"未找到图片: {src}")
-            return re.sub(r'src\s*=\s*["\'][^"\']+["\']', 'src="#"', full_tag)
+            try:
+                full_tag = match.group(0)
+                src = match.group(1)
+                
+                # 避免处理已经是data URL的图片
+                if src.startswith('data:'):
+                    return full_tag
+                
+                # 预定义的图片路径变换（避免动态扩展导致的问题）
+                possible_keys = [
+                    src,  # 原始路径
+                    src.split('/')[-1],  # 只要文件名
+                    src.replace('../', ''),  # 移除相对路径前缀
+                    src.replace('./', ''),  # 移除当前目录前缀
+                    src.lstrip('/'),  # 移除开头的斜杠
+                    src.replace('images/', ''),  # 移除images目录前缀
+                    src.replace('Images/', ''),  # 移除Images目录前缀（大写）
+                    src.replace('IMAGES/', ''),  # 移除IMAGES目录前缀（全大写）
+                ]
+                
+                # 添加仅文件名的变体（限制数量以避免过度扩展）
+                base_filename = src.split('/')[-1]
+                if base_filename not in possible_keys:
+                    possible_keys.append(base_filename)
+                
+                # 去重并限制数量
+                possible_keys = list(dict.fromkeys(possible_keys))[:10]  # 最多尝试10种变体
+                
+                # 尝试查找匹配的图片
+                for key in possible_keys:
+                    if key and key in images:
+                        # 替换src属性，使用更安全的方式
+                        escaped_image_data = images[key].replace('"', '&quot;')
+                        new_tag = re.sub(
+                            r'src\s*=\s*["\'][^"\']+["\']', 
+                            f'src="{escaped_image_data}"', 
+                            full_tag, 
+                            count=1  # 只替换第一个匹配项
+                        )
+                        return new_tag
+                
+                # 如果没找到匹配的图片，返回原标签但移除src以避免错误
+                self.logger.debug(f"未找到图片: {src}")
+                return re.sub(r'src\s*=\s*["\'][^"\']+["\']', 'src="#"', full_tag, count=1)
+                
+            except Exception as e:
+                self.logger.warning(f"处理图片标签时出错: {e}")
+                return match.group(0)  # 返回原始标签
         
-        # 执行替换
-        content = re.sub(img_pattern, replace_img_src, content, flags=re.IGNORECASE)
-        return content
+        try:
+            # 执行替换，限制替换次数以避免递归过深
+            content = re.sub(img_pattern, replace_img_src, content, flags=re.IGNORECASE)
+            return content
+        except RecursionError as e:
+            self.logger.error(f"图片替换时递归过深: {e}")
+            # 如果递归过深，返回移除所有图片src的版本
+            return re.sub(r'<img[^>]*src\s*=\s*["\'][^"\']+["\']', '<img src="#"', content, flags=re.IGNORECASE)
     
     def extract_images_from_epub(self, book) -> Dict[str, str]:
         """
@@ -300,27 +329,48 @@ class EPUBtoPDFConverter:
             图片文件映射字典 {文件名: base64_data_url}
         """
         images = {}
+        processed_count = 0
+        max_images = 500  # 限制最大图片数量，防止内存问题
+        max_size = 5 * 1024 * 1024  # 单个图片最大5MB
+        
         try:
             for item in book.get_items():
                 if item.get_type() == ebooklib.ITEM_IMAGE:
-                    # 获取图片内容和MIME类型
-                    content = item.get_content()
-                    filename = item.get_name()
+                    if processed_count >= max_images:
+                        self.logger.warning(f"图片数量超过限制({max_images})，跳过剩余图片")
+                        break
+                        
+                    try:
+                        # 获取图片内容和MIME类型
+                        content = item.get_content()
+                        filename = item.get_name()
+                        
+                        # 检查图片大小
+                        if len(content) > max_size:
+                            self.logger.warning(f"图片 {filename} 太大({len(content)} bytes)，跳过")
+                            continue
+                        
+                        # 根据文件扩展名确定MIME类型
+                        mime_type = self._get_image_mime_type(filename)
+                        
+                        # 转换为base64编码的data URL
+                        base64_content = base64.b64encode(content).decode('utf-8')
+                        data_url = f"data:{mime_type};base64,{base64_content}"
+                        
+                        # 使用有限的路径格式作为键，避免过度扩展
+                        base_name = filename.split('/')[-1]
+                        images[filename] = data_url
+                        if base_name != filename:
+                            images[base_name] = data_url
+                        
+                        processed_count += 1
+                        
+                    except Exception as e:
+                        self.logger.warning(f"处理图片 {item.get_name()} 失败: {e}")
+                        continue
                     
-                    # 根据文件扩展名确定MIME类型
-                    mime_type = self._get_image_mime_type(filename)
-                    
-                    # 转换为base64编码的data URL
-                    base64_content = base64.b64encode(content).decode('utf-8')
-                    data_url = f"data:{mime_type};base64,{base64_content}"
-                    
-                    # 使用多种可能的路径格式作为键
-                    images[filename] = data_url
-                    images[filename.split('/')[-1]] = data_url  # 只有文件名
-                    if '/' in filename:
-                        images[filename.replace('/', '')] = data_url  # 移除路径分隔符
-                    
-            self.logger.info(f"提取了 {len(set(images.values()))} 个图片资源")
+            unique_images = len(set(images.values()))
+            self.logger.info(f"提取了 {unique_images} 个图片资源 (总计 {processed_count} 个引用)")
         except Exception as e:
             self.logger.warning(f"提取图片失败: {e}")
         return images

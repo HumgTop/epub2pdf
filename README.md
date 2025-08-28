@@ -14,28 +14,9 @@
 - 📄 页码支持：自动添加页码
 - 🎨 中文优化：针对中文显示进行优化
 
-## 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 系统依赖
-
-**macOS:**
-```bash
-brew install cairo pango gdk-pixbuf libffi
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info
-```
-
-**Windows:**
-下载并安装GTK+ for Windows: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer
-
 ## 使用方法
+
+> **💡 提示**: 启动脚本会自动处理所有依赖安装，无需手动安装！
 
 ### 方法一：使用启动脚本（推荐）
 
@@ -45,13 +26,17 @@ sudo apt-get install build-essential python3-dev python3-pip python3-setuptools 
 ```
 
 启动脚本会自动：
+- 检查和安装Python依赖
 - 创建和激活虚拟环境
-- 安装所需依赖
+- 创建必要的目录结构
 - 运行转换程序
 
-**Windows用户请使用方法二手动运行**
+> **⚠️ Windows用户注意**: 需要先安装GTK+ for Windows: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer，然后使用方法二手动运行
 
-### 方法二：手动运行
+### 方法二：手动运行（仅适用于高级用户）
+
+<details>
+<summary>点击展开手动安装步骤</summary>
 
 1. **创建虚拟环境：**
    ```bash
@@ -69,25 +54,28 @@ sudo apt-get install build-essential python3-dev python3-pip python3-setuptools 
    pip install -r requirements.txt
    ```
 
-3. **准备EPUB文件：**
-   将需要转换的EPUB文件放置到`source_book`目录中。支持子目录结构，例如：
-
-   ```
-   source_book/
-   ├── 小说/
-   │   ├── 三体.epub
-   │   └── 流浪地球.epub
-   ├── 技术书籍/
-   │   ├── Python编程.epub
-   │   └── 算法导论.epub
-   └── 其他/
-       └── 历史书.epub
-   ```
-
-4. **运行转换：**
+3. **运行转换：**
    ```bash
    python epub2pdf.py
    ```
+
+</details>
+
+### 准备EPUB文件
+
+将需要转换的EPUB文件放置到`source_book`目录中。支持子目录结构，例如：
+
+```
+source_book/
+├── 小说/
+│   ├── 三体.epub
+│   └── 流浪地球.epub
+├── 技术书籍/
+│   ├── Python编程.epub
+│   └── 算法导论.epub
+└── 其他/
+    └── 历史书.epub
+```
 
 ### 查看结果
 
@@ -164,6 +152,12 @@ converter.convert_epub_to_pdf(epub_file)
 
 ### Q: 转换速度较慢怎么办？
 A: EPUB转PDF是一个计算密集型操作，特别是包含大量图片的书籍。这是正常现象。
+
+### Q: 依赖安装失败怎么办？
+A: 如果`run.sh`脚本安装依赖失败，可能的原因和解决方案：
+- **macOS**: 可能需要先安装系统依赖 `brew install cairo pango gdk-pixbuf libffi`
+- **Ubuntu/Debian**: 需要安装 `sudo apt-get install build-essential python3-dev python3-pip python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info`
+- **Windows**: 需要先安装GTK+ for Windows
 
 ### Q: 某些EPUB文件转换失败怎么办？
 A: 检查日志输出中的错误信息。常见原因包括：

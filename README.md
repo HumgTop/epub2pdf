@@ -1,5 +1,7 @@
 # EPUB转PDF工具
 
+[English](README_EN.md) | 中文
+
 一个简单易用的Python工具，用于批量将EPUB格式的电子书转换为PDF格式。
 
 ## 功能特点
@@ -35,29 +37,59 @@ sudo apt-get install build-essential python3-dev python3-pip python3-setuptools 
 
 ## 使用方法
 
-### 1. 准备EPUB文件
+### 方法一：使用启动脚本（推荐）
 
-将需要转换的EPUB文件放置到`source_book`目录中。支持子目录结构，例如：
-
-```
-source_book/
-├── 小说/
-│   ├── 三体.epub
-│   └── 流浪地球.epub
-├── 技术书籍/
-│   ├── Python编程.epub
-│   └── 算法导论.epub
-└── 其他/
-    └── 历史书.epub
-```
-
-### 2. 运行转换
-
+**macOS/Linux:**
 ```bash
-python epub2pdf.py
+./run.sh
 ```
 
-### 3. 查看结果
+启动脚本会自动：
+- 创建和激活虚拟环境
+- 安装所需依赖
+- 运行转换程序
+
+**Windows用户请使用方法二手动运行**
+
+### 方法二：手动运行
+
+1. **创建虚拟环境：**
+   ```bash
+   # macOS/Linux
+   python3 -m venv venv
+   source venv/bin/activate
+   
+   # Windows
+   python -m venv venv
+   venv\Scripts\activate.bat
+   ```
+
+2. **安装依赖：**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **准备EPUB文件：**
+   将需要转换的EPUB文件放置到`source_book`目录中。支持子目录结构，例如：
+
+   ```
+   source_book/
+   ├── 小说/
+   │   ├── 三体.epub
+   │   └── 流浪地球.epub
+   ├── 技术书籍/
+   │   ├── Python编程.epub
+   │   └── 算法导论.epub
+   └── 其他/
+       └── 历史书.epub
+   ```
+
+4. **运行转换：**
+   ```bash
+   python epub2pdf.py
+   ```
+
+### 查看结果
 
 转换完成后，PDF文件将保存在`output_book`目录中，保持与源目录相同的结构：
 
@@ -112,10 +144,11 @@ converter.convert_epub_to_pdf(epub_file)
 
 1. 扫描源目录中的所有EPUB文件
 2. 检查目标PDF是否已存在且为最新版本
-3. 解析EPUB文件，提取章节内容
-4. 生成格式化的HTML内容
-5. 使用WeasyPrint将HTML转换为PDF
-6. 保存PDF到输出目录
+3. 解析EPUB文件，提取章节内容和图片资源
+4. 将图片转换为base64编码并嵌入HTML
+5. 生成格式化的HTML内容
+6. 使用WeasyPrint将HTML转换为PDF
+7. 保存PDF到输出目录
 
 ### PDF格式特点
 
@@ -124,6 +157,8 @@ converter.convert_epub_to_pdf(epub_file)
 - 2cm页边距
 - 自动页码
 - 保留原书标题和作者信息
+- 图片自动适配页面宽度，居中显示
+- 完整保留EPUB中的所有图片内容
 
 ## 常见问题
 
